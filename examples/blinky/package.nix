@@ -27,9 +27,21 @@
 
     nativeBuildInputs = [verilator python3 verilambda-shim-gen];
 
+    # Copy sources into a fresh build tree rather than symlinking. Verilator
+    # caches absolute paths of its source files into its generated Makefile,
+    # and when the source is a symlink to a user-space working tree (e.g.
+    # via a `path:` flake input), the cached path is the working-tree one —
+    # which doesn't exist inside the Nix build sandbox. An explicit copy
+    # forces verilator to record the sandbox path and keeps the build
+    # hermetic.
     buildPhase = ''
       runHook preBuild
-      mkdir -p cbits
+      export BUILD=$PWD/build
+      rm -rf "$BUILD"
+      mkdir -p "$BUILD/cbits" "$BUILD/verilog"
+      cp clash-manifest.json "$BUILD/"
+      cp verilog/blinky.v "$BUILD/verilog/"
+      cd "$BUILD"
       verilambda-shim-gen \
         --manifest clash-manifest.json \
         --out-dir cbits
@@ -45,9 +57,9 @@
     installPhase = ''
       runHook preInstall
       mkdir -p $out/lib $out/include
-      cp obj_dir/libVblinky.a $out/lib/
-      cp obj_dir/libverilated.a $out/lib/
-      cp cbits/verilambda_blinky_shim.h $out/include/
+      cp $BUILD/obj_dir/libVblinky.a $out/lib/
+      cp $BUILD/obj_dir/libverilated.a $out/lib/
+      cp $BUILD/cbits/verilambda_blinky_shim.h $out/include/
       runHook postInstall
     '';
 
