@@ -67,7 +67,7 @@ renderShimHeader ShimGenInput {..} =
          , "VerilambdaSim verilambda_" <> lowerTop <> "_new(void);"
          , "void verilambda_" <> lowerTop <> "_delete(VerilambdaSim sim);"
          , ""
-         , "/* Copy in.inputs → model, eval, copy every port → out."
+         , "/* Copy in.inputs -> model, eval, copy every port -> out."
          , " * in and out may alias. */"
          , "void verilambda_" <> lowerTop <> "_step("
          , "    VerilambdaSim sim,"
@@ -179,7 +179,7 @@ renderShimSource ShimGenInput {..} =
   writeInputLine :: Port -> Text
   writeInputLine p = case portDirection p of
     In -> "  w->top->" <> portName p <> " = in->" <> portName p <> ";"
-    Out -> "  /* " <> portName p <> " is an output — not driven from in */"
+    Out -> "  /* " <> portName p <> " is an output, not driven from in */"
     InOut -> "  /* " <> portName p <> " InOut not supported in v0.1 */"
 
   readPortLine :: Port -> Text

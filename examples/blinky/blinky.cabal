@@ -6,10 +6,6 @@ name:          verilambda-example-blinky
 version:       0.0.0
 synopsis:      End-to-end verilambda demo on the DE2 Blinky design
 license:       (MIT OR BSD-3-Clause)
-license-files:
-  ../../LICENSE-BSD
-  ../../LICENSE-MIT
-
 author:        Mika Tammi
 maintainer:    mikatammi@gmail.com
 copyright:     2026 Mika Tammi
@@ -32,11 +28,9 @@ executable blinky-sim
     , clash-prelude  ^>=1.8
     , verilambda
 
-  -- The C++ shim + Verilator runtime are built upstream (by the Nix
-  -- derivation that packages this example) and exposed here via
-  -- extra-libraries / extra-lib-dirs, set via `cabal configure
-  -- --extra-lib-dirs=…` at build time.
-  extra-libraries:
-    Vblinky
-    verilated
-    stdc++
+-- The C++ shim + Verilator runtime are built upstream and linked via
+--   cabal configure --extra-lib-dirs=PATH_TO_LIBS \
+--                   --ghc-options="-lVblinky -lverilated -lstdc++"
+-- The Nix derivation (examples/blinky/package.nix) supplies these
+-- flags automatically; the shell script `build-and-run.sh` passes the
+-- equivalent CLI args.
