@@ -23,6 +23,7 @@ _: {
 
         # Native toolchain for C++ shim + Verilator
         pkgs.verilator
+        pkgs.python3 # Verilator's build harness calls verilator_includer.py
         pkgs.clang-tools # clang-format
         pkgs.gcc
         pkgs.gnumake
