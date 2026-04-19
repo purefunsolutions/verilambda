@@ -45,9 +45,39 @@ common warnings
     -Wincomplete-uni-patterns -Wmissing-export-lists
     -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
 
+common language
+  default-language:   GHC2021
+  default-extensions:
+    DataKinds
+    DeriveAnyClass
+    DerivingStrategies
+    LambdaCase
+    OverloadedStrings
+    RecordWildCards
+    TypeFamilies
+
 library
-  import:           warnings
-  exposed-modules:  Verilambda
-  build-depends:    base >=4.20 && <5
-  hs-source-dirs:   src
-  default-language: GHC2021
+  import:          warnings, language
+  exposed-modules:
+    Verilambda
+    Verilambda.Types
+
+  build-depends:
+    , base           >=4.20 && <5
+    , clash-prelude  ^>=1.8
+
+  hs-source-dirs:  src
+
+test-suite verilambda-test
+  import:         warnings, language
+  type:           exitcode-stdio-1.0
+  main-is:        Main.hs
+  other-modules:  Verilambda.TypesSpec
+  hs-source-dirs: test
+  build-depends:
+    , base
+    , hedgehog        >=1.4  && <2
+    , tasty           >=1.5  && <1.6
+    , tasty-hedgehog  >=1.4  && <1.5
+    , tasty-hunit     >=0.10 && <0.11
+    , verilambda
