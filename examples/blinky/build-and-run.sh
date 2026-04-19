@@ -36,9 +36,11 @@ verilator \
 echo "== 3/3: cabal build + run"
 cabal build \
   --extra-lib-dirs="$HERE/obj_dir" \
+  --ghc-options="-lVblinky -lverilated -lstdc++" \
   blinky-sim
 
 echo "== Running blinky-sim"
 cabal run \
   --extra-lib-dirs="$HERE/obj_dir" \
+  --ghc-options="-lVblinky -lverilated -lstdc++" \
   blinky-sim

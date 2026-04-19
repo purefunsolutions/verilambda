@@ -8,6 +8,7 @@ module Main (main) where
 
 import Data.Text qualified as Text
 import Data.Text.IO qualified as TIO
+import GHC.IO.Encoding (setLocaleEncoding, utf8)
 import Options.Applicative
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath ((</>))
@@ -43,6 +44,9 @@ optionsParser =
 
 main :: IO ()
 main = do
+  -- Force UTF-8 file I/O even in sandboxed builds (NixOS nix-build,
+  -- containerised CI) where the default locale is often POSIX/C.
+  setLocaleEncoding utf8
   opts <-
     execParser $
       info
