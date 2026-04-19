@@ -1,0 +1,53 @@
+cabal-version:      3.0
+
+-- SPDX-FileCopyrightText: 2026 Mika Tammi
+-- SPDX-License-Identifier: MIT OR BSD-3-Clause
+name:               verilambda
+version:            0.0.0
+synopsis:           Haskell bindings for Verilator simulation
+description:
+  verilambda is an actively-maintained, type-preserving alternative to
+  clashilator. It lets you write hardware testbenches for
+  Verilator-compiled designs in idiomatic monadic Haskell, with
+  type-level port reflection via higher-kinded data.
+  .
+  Pre-release. First tagged version is in progress; expect API churn
+  until v0.1.0.
+
+license:            (MIT OR BSD-3-Clause)
+license-files:
+  LICENSES/BSD-3-Clause.txt
+  LICENSES/MIT.txt
+
+author:             Mika Tammi
+maintainer:         mikatammi@gmail.com
+copyright:          2026 Mika Tammi
+category:           Hardware
+build-type:         Custom
+extra-source-files:
+  PLAN.md
+  README.md
+
+tested-with:        GHC ==9.10.3
+
+source-repository head
+  type:     git
+  location: https://github.com/mikatammi/verilambda
+
+custom-setup
+  setup-depends:
+    , base
+    , Cabal  >=3.0
+
+common warnings
+  ghc-options:
+    -Wall -Wcompat -Widentities -Wincomplete-record-updates
+    -Wincomplete-uni-patterns -Wmissing-export-lists
+    -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
+
+library
+  import:           warnings
+  exposed-modules:  Verilambda
+  build-depends:    base >=4.20 && <5
+  hs-source-dirs:   src
+  default-language: GHC2021
