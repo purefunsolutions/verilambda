@@ -477,7 +477,7 @@ alterade2-flake/
 The flake.nix gains a new input:
 
 ```nix
-verilambda.url = "github:mikatammi/verilambda";
+verilambda.url = "github:purefunsolutions/verilambda";
 # or during local dev:
 # verilambda.url = "path:/home/mika/verilambda";
 ```
