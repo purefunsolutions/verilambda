@@ -12,3 +12,8 @@ newlines-between-decls: 1
 function-arrows: trailing
 record-brace-space: true
 indent-wheres: false
+
+# fourmolu won't parse CPP-tagged files otherwise; Verilambda.Setup uses
+# #if MIN_VERSION_Cabal(3,14,0) to cope with Cabal 3.14's path-type change.
+language-extensions:
+  - CPP

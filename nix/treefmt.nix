@@ -37,6 +37,11 @@
         # Markdown
         mdformat.enable = true;
       };
+
+      # Verilambda.Setup uses CPP to bridge Cabal 3.12 and 3.14's
+      # SymbolicPath API change. fourmolu's parser doesn't handle CPP
+      # cleanly; exclude the file from formatting (hlint still lints it).
+      settings.formatter.fourmolu.excludes = ["src/Verilambda/Setup.hs"];
     };
 
     formatter = config.treefmt.build.wrapper;

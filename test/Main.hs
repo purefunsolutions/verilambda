@@ -5,6 +5,7 @@
 module Main (main) where
 
 import Test.Tasty (TestTree, defaultMain, testGroup)
+import Verilambda.BuildDriverSpec qualified
 import Verilambda.ManifestSpec qualified
 import Verilambda.PortsSpec qualified
 import Verilambda.TypesSpec qualified
@@ -19,4 +20,5 @@ allTests =
     [ Verilambda.TypesSpec.tests
     , Verilambda.ManifestSpec.tests
     , Verilambda.PortsSpec.tests
+    , Verilambda.BuildDriverSpec.tests
     ]

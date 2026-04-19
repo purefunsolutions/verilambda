@@ -83,6 +83,41 @@ Or clone locally and reference via `cabal.project`:
 packages: . /path/to/verilambda
 ```
 
+## Integration: `build-type: Custom`
+
+A downstream Haskell project can integrate the shim-gen + verilator
+pipeline into `cabal build` via a small `Setup.hs`:
+
+```haskell
+-- Setup.hs
+module Main (main) where
+import Verilambda.Setup (verilambdaMainWithHooks, defaultBuildConfig, BuildConfig (..))
+
+main :: IO ()
+main = verilambdaMainWithHooks defaultBuildConfig
+  { bcManifestPath = "clash-manifest.json"
+  , bcTopName      = "blinky"
+  , bcVerilogFiles = [ "verilog/blinky.v" ]
+  }
+```
+
+The matching `.cabal` stanza:
+
+```
+build-type: Custom
+custom-setup
+  setup-depends: base, Cabal >= 3.0, verilambda, directory, process
+```
+
+`verilambdaMainWithHooks` runs shim-gen + verilator in the pre-build
+hook and injects the resulting `extra-lib-dirs` + `extra-libs` into
+every component's `BuildInfo` automatically. Requires
+`verilambda-shim-gen` and `verilator` on `$PATH` at build time.
+
+A `build-type: Hooks` adapter for Cabal 3.14+ is planned for v0.2 —
+the `Verilambda.BuildDriver` module already factors out the pure
+pipeline so both adapters can share it.
+
 ## Documentation
 
 - [`PLAN.md`](./PLAN.md) — the design document this project is being built
