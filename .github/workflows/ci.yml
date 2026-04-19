@@ -1,0 +1,52 @@
+# SPDX-FileCopyrightText: 2026 Mika Tammi
+# SPDX-License-Identifier: MIT OR BSD-3-Clause
+
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  flake-check:
+    name: nix flake check
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - run: nix flake check --no-write-lock-file -L
+
+  blinky-demo:
+    name: blinky-sim end-to-end run
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: flake-check
+    steps:
+      - uses: actions/checkout@v6
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Build blinky-sim (default GHC 9.10)
+        run: nix build --no-write-lock-file -L .#blinky-sim
+
+      - name: Run blinky-sim and validate LEDR transitions
+        run: |
+          out=$(./result/bin/blinky-sim)
+          echo "$out"
+          echo "$out" | grep -q '4194303  00000001'
+          echo "$out" | grep -q '8388607  00000010'
+
+      - name: Build blinky-sim on GHC 9.12
+        run: nix build --no-write-lock-file -L .#blinky-sim-ghc912
