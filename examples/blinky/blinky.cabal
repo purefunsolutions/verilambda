@@ -1,0 +1,42 @@
+cabal-version: 3.0
+
+-- SPDX-FileCopyrightText: 2026 Mika Tammi
+-- SPDX-License-Identifier: MIT OR BSD-3-Clause
+name:          verilambda-example-blinky
+version:       0.0.0
+synopsis:      End-to-end verilambda demo on the DE2 Blinky design
+license:       (MIT OR BSD-3-Clause)
+license-files:
+  ../../LICENSE-BSD
+  ../../LICENSE-MIT
+
+author:        Mika Tammi
+maintainer:    mikatammi@gmail.com
+copyright:     2026 Mika Tammi
+category:      Hardware
+build-type:    Simple
+tested-with:   GHC ==9.10.3
+
+executable blinky-sim
+  main-is:            Main.hs
+  hs-source-dirs:     src
+  default-language:   GHC2021
+  default-extensions:
+    DataKinds
+    DeriveAnyClass
+    DerivingStrategies
+
+  ghc-options:        -Wall -Wcompat
+  build-depends:
+    , base           >=4.20 && <5
+    , clash-prelude  ^>=1.8
+    , verilambda
+
+  -- The C++ shim + Verilator runtime are built upstream (by the Nix
+  -- derivation that packages this example) and exposed here via
+  -- extra-libraries / extra-lib-dirs, set via `cabal configure
+  -- --extra-lib-dirs=…` at build time.
+  extra-libraries:
+    Vblinky
+    verilated
+    stdc++

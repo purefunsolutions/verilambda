@@ -40,3 +40,6 @@ Thumbs.db
 *.vcd
 *.fst
 obj_dir/
+
+# Generated shim C++ emitted into examples by verilambda-shim-gen
+cbits/
