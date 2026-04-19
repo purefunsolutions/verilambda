@@ -49,9 +49,9 @@ aims to be:
 Three layers:
 
 1. You declare your DUT's ports once as a higher-kinded data record.
-2. At `cabal build` time, verilambda reads the Clash manifest, generates a
+1. At `cabal build` time, verilambda reads the Clash manifest, generates a
    thin C ABI shim, and invokes Verilator to compile it.
-3. At runtime, a `SimM` monad exposes a clean API (`cycles`, `#port .= value`,
+1. At runtime, a `SimM` monad exposes a clean API (`cycles`, `#port .= value`,
    `#port `shouldBe` value`, `withTrace`) over the compiled model.
 
 No runtime parsing, no Template Haskell, no string-keyed port lookups.

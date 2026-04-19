@@ -48,29 +48,32 @@ Our MVP should land around **~800 LOC of Haskell + ~100 LOC of C++ template**, c
 ## Design decisions
 
 1. **Location**: new sibling flake repo at `/home/mika/verilambda/`. Pre-created as empty git repo, no commits yet. alterade2-flake takes it as a flake input once the first release tag exists.
-2. **Name**: `verilambda` (Verilator + λ). Package name `verilambda` on Hackage.
-3. **Port DSL**: HKD records via `barbies`. Default choice; no TH, fewest user keystrokes, best ergonomics.
-4. **GHC floor**: **9.10.3** (the version nixpkgs 25.11's `haskellPackages` defaults to, and the GHC alterade2-flake's Clash 1.8.4 builds against). No reason to exclude users stuck on current-stable nixpkgs. Test matrix should also cover 9.12.4 when practical.
-5. **Build-type — verilambda itself**: `Custom` with a minimal `Setup.hs` (Cabal 3.12 compatible, works on GHC 9.10). Rationale: `build-type: Hooks` needs Cabal 3.14+ (GHC 9.12+), which we explicitly can't require as baseline. Setup.hs will be ~60 lines, mirroring clashilator's shape but without Mustache/hsc2hs.
+1. **Name**: `verilambda` (Verilator + λ). Package name `verilambda` on Hackage.
+1. **Port DSL**: HKD records via `barbies`. Default choice; no TH, fewest user keystrokes, best ergonomics.
+1. **GHC floor**: **9.10.3** (the version nixpkgs 25.11's `haskellPackages` defaults to, and the GHC alterade2-flake's Clash 1.8.4 builds against). No reason to exclude users stuck on current-stable nixpkgs. Test matrix should also cover 9.12.4 when practical.
+1. **Build-type — verilambda itself**: `Custom` with a minimal `Setup.hs` (Cabal 3.12 compatible, works on GHC 9.10). Rationale: `build-type: Hooks` needs Cabal 3.14+ (GHC 9.12+), which we explicitly can't require as baseline. Setup.hs will be ~60 lines, mirroring clashilator's shape but without Mustache/hsc2hs.
 
 5b. **Build-type — downstream consumers**: verilambda exposes **both** integration APIs so downstream projects can pick the one that fits their Cabal:
-   - `Verilambda.Setup` — classic UserHooks-based API. Works with Cabal 3.0+. Users put `build-type: Custom` in their `.cabal` and a 5-line `Setup.hs` that calls `verilambdaMainWithHooks`.
-   - `Verilambda.Setup.Hooks` — modern BuildHooks API. CPP-guarded with `#if MIN_VERSION_Cabal(3,14,0)`, so the module only compiles when verilambda itself was built against Cabal 3.14+. Users put `build-type: Hooks` and `hooks-executable: verilambda-hooks` in their `.cabal`.
-   - Both APIs wrap the same underlying `runShimGen` + `invokeVerilator` functions (exposed as `Verilambda.BuildDriver` for ultra-custom setups).
-   - Documented side-by-side in `doc/integration.md` with a "which one do I want?" decision tree.
+
+- `Verilambda.Setup` — classic UserHooks-based API. Works with Cabal 3.0+. Users put `build-type: Custom` in their `.cabal` and a 5-line `Setup.hs` that calls `verilambdaMainWithHooks`.
+- `Verilambda.Setup.Hooks` — modern BuildHooks API. CPP-guarded with `#if MIN_VERSION_Cabal(3,14,0)`, so the module only compiles when verilambda itself was built against Cabal 3.14+. Users put `build-type: Hooks` and `hooks-executable: verilambda-hooks` in their `.cabal`.
+- Both APIs wrap the same underlying `runShimGen` + `invokeVerilator` functions (exposed as `Verilambda.BuildDriver` for ultra-custom setups).
+- Documented side-by-side in `doc/integration.md` with a "which one do I want?" decision tree.
+
 6. **License**: MIT OR BSD-3-Clause dual from day 1.
-7. **FFI strategy**: auto-generate a thin C++ shim from the Clash manifest at build time; the shim exposes a C ABI (`step`, `reset`, `trace_start`, `trace_dump`). Haskell side uses `foreign import ccall` against that C ABI.
-8. **Type preservation**: at the Haskell layer, ports stay as Clash types (`Bit`, `BitVector n`, `Signed n`, `Unsigned n`). Coerce-based zero-cost conversions at the FFI boundary. The C ABI sees fixed-width `uint8_t`/`uint16_t`/`uint32_t`/`uint64_t`; the Haskell layer wraps them in the strongly-typed Clash newtypes.
-9. **Metadata source**: `clash-manifest.json`. We parse it with `aeson`. If a non-Clash user wants to use verilambda with hand-written Verilog, they supply their own tiny manifest — documented format.
-10. **Test framework**: **Tasty** as the aggregator, with `tasty-hunit` (unit), `tasty-quickcheck` (property, historical), `tasty-hedgehog` (property, modern alternative), and `tasty-golden` (C++ shim codegen tests). Both property-testing styles work under one runner. `cabal test` runs everything; coverage via `cabal test --enable-coverage` + `hpc markup`.
-11. **Coverage target**: aim for 100% line + branch coverage on the Haskell side, firm floor **90%**. The C++ shim is generated code; we cover it indirectly through integration tests. CI fails if coverage drops below 90%.
-12. **Examples as tests**: under `examples/`, each example is a runnable Cabal target with its own assertions. A top-level `cabal test` in verilambda runs them all as test cases — so examples can't rot. Every example covers at least one distinct feature: Blinky (counter + reset), FIFO (multi-input, buffered output), Mux (enum-ish inputs, etc.).
+1. **FFI strategy**: auto-generate a thin C++ shim from the Clash manifest at build time; the shim exposes a C ABI (`step`, `reset`, `trace_start`, `trace_dump`). Haskell side uses `foreign import ccall` against that C ABI.
+1. **Type preservation**: at the Haskell layer, ports stay as Clash types (`Bit`, `BitVector n`, `Signed n`, `Unsigned n`). Coerce-based zero-cost conversions at the FFI boundary. The C ABI sees fixed-width `uint8_t`/`uint16_t`/`uint32_t`/`uint64_t`; the Haskell layer wraps them in the strongly-typed Clash newtypes.
+1. **Metadata source**: `clash-manifest.json`. We parse it with `aeson`. If a non-Clash user wants to use verilambda with hand-written Verilog, they supply their own tiny manifest — documented format.
+1. **Test framework**: **Tasty** as the aggregator, with `tasty-hunit` (unit), `tasty-quickcheck` (property, historical), `tasty-hedgehog` (property, modern alternative), and `tasty-golden` (C++ shim codegen tests). Both property-testing styles work under one runner. `cabal test` runs everything; coverage via `cabal test --enable-coverage` + `hpc markup`.
+1. **Coverage target**: aim for 100% line + branch coverage on the Haskell side, firm floor **90%**. The C++ shim is generated code; we cover it indirectly through integration tests. CI fails if coverage drops below 90%.
+1. **Examples as tests**: under `examples/`, each example is a runnable Cabal target with its own assertions. A top-level `cabal test` in verilambda runs them all as test cases — so examples can't rot. Every example covers at least one distinct feature: Blinky (counter + reset), FIFO (multi-input, buffered output), Mux (enum-ish inputs, etc.).
 
 ## Code quality & ergonomics (non-negotiable)
 
 This library exists to be *nice to use*, not just to work. The whole reason to replace clashilator is ergonomics. The user-facing API and the internal code should both reflect that:
 
 **User-facing ergonomics**:
+
 - **One-record port spec** — users declare their DUT ports once as a HKD record and never re-state port names, widths, or directions anywhere else in their code. No duplicated manifest YAML, no port-list typeclass instances to hand-write, no string-keyed lookups at the call site.
 - **The `SimM` monad reads like prose** — `runSim`, `cycles`, `assertReset`, `shouldBe` are common-English verbs and nouns. A reader who doesn't know the library can still tell what a testbench does on first read.
 - **Overloaded labels for ports** — `#ledr`, `#clock_50` refer to the HKD record fields at the type level. Typos are compile-time errors. No stringly-typed lookups anywhere user code touches.
@@ -83,6 +86,7 @@ This library exists to be *nice to use*, not just to work. The whole reason to r
 - **No orphan instance pollution** — everything the user needs to derive on their port record is re-exported from `Verilambda` with standard `deriving stock`/`deriving anyclass` idioms.
 
 **Internal code quality**:
+
 - **Readable over clever** — prefer straight-line `IO` with named helper functions over mega-`do` blocks. Prefer explicit `Data.ByteString` / `Data.Text` operations over ad-hoc string munging. Comments explain *why*, not *what*.
 - **Small modules** — each module has one concept. If a module exceeds ~300 lines, it splits. `Manifest.hs` parses manifests; it does not also emit C++.
 - **No Template Haskell anywhere** — stated design constraint; enforced by code review.
@@ -94,6 +98,7 @@ This library exists to be *nice to use*, not just to work. The whole reason to r
 - **Naming**: verbs for actions (`runFor`, `pokeInputs`), nouns for values (`Sim`, `Ports`), adjectives prefix flags (`dirtyBuild`). No Hungarian notation.
 
 **Documentation ergonomics**:
+
 - README opens with a 15-line working example, not a feature list.
 - Each module's header Haddock explains *what problem this module solves*, not *what this module contains*.
 - `doc/architecture.md` has a diagram (ASCII or `.svg`) of the three layers — nothing replaces a picture for "how does this fit together".
@@ -103,26 +108,32 @@ This library exists to be *nice to use*, not just to work. The whole reason to r
 `nix/treefmt.nix` wires up a single `nix fmt` entry point + a `nix flake check` that verifies the tree is clean. All tools are the most modern variants available in nixpkgs 25.11:
 
 **Nix**:
+
 - **`alejandra`** — opinionated Nix formatter; zero-config, consistent with alterade2-flake
 - **`deadnix`** — flags and removes unused Nix bindings / dead branches
 - **`statix`** — Nix anti-pattern linter (e.g. `with`-shadowing, legacy idioms)
 
 **Haskell**:
+
 - **`fourmolu`** — the actively-maintained fork of ormolu. Currently the Haskell-community default; configurable via `fourmolu.yaml`. Committed config sets `indentation: 2`, `comma-style: leading`, `import-export-style: diff-friendly`, `respectful: true`.
 - **`hlint`** — the canonical Haskell linter. Run both in `treefmt` (as a check) and in HLS (interactively). Committed `.hlint.yaml` with project-specific rule adjustments (e.g. allow `Data.Map.Strict as Map` even when strict isn't required).
 - **`stylish-haskell`** — deliberately **NOT** used. fourmolu now covers import formatting comprehensively; two formatters fighting each other is a footgun.
 
 **Cabal**:
+
 - **`cabal-fmt`** — formats `.cabal` files consistently. Keeps `build-depends` alphabetised with trailing commas, avoids reflow noise.
 
 **C++** (for the shim template + any hand-written C):
+
 - **`clang-format`** — formats `shim.cpp.template` and any literal C++ strings. Uses a `.clang-format` committed at repo root with `BasedOnStyle: LLVM`, `IndentWidth: 2`.
 
 **Shell** (for the one or two small helper scripts):
+
 - **`shellcheck`** — lints bash. Mandatory on anything that goes into `runtimeInputs` of a `writeShellApplication`.
 - **`shfmt`** — formats bash consistently.
 
 **Markdown** (for `doc/`, `README.md`, `PLAN.md`):
+
 - **`mdformat`** — light, consistent Markdown formatting. Configured not to reflow tables or lists aggressively so diffs stay meaningful.
 
 **Everything together** in `nix/treefmt.nix`:
@@ -150,10 +161,11 @@ treefmt.config = {
 ```
 
 **`nix flake check`** runs:
+
 1. `treefmt --ci` — fails if any file would be reformatted
-2. `hlint src/ test/ examples/` — fails on warning-severity issues (upgraded from hlint's default)
-3. `hpc` coverage threshold check (separate script in `nix/checks.nix`)
-4. `cabal test` via `haskellPackages.buildFromCabalSdist` — the standard flake-check wrapper
+1. `hlint src/ test/ examples/` — fails on warning-severity issues (upgraded from hlint's default)
+1. `hpc` coverage threshold check (separate script in `nix/checks.nix`)
+1. `cabal test` via `haskellPackages.buildFromCabalSdist` — the standard flake-check wrapper
 
 **CI rule**: every PR must be `nix flake check`-clean before merge. No `-- HLINT` pragmas without a comment explaining why.
 
@@ -270,40 +282,47 @@ That's the whole thing. No pointer types, no `peekOutputs`, no HKD pattern-match
 
 1. **`SimM` monad** — concrete `ReaderT SimEnv IO` under the hood. A type class `MonadSim` layered on top so users *can* run in `StateT`/`ExceptT` stacks if they need to, but the default is just: a monadic block.
 
-2. **Overloaded labels for ports** — `#ledr`, `#clock_50`, `#key0`. Resolved at compile time against the HKD record's field names via `IsLabel` + `HasField` instances. Typos are type errors, not runtime lookups.
+1. **Overloaded labels for ports** — `#ledr`, `#clock_50`, `#key0`. Resolved at compile time against the HKD record's field names via `IsLabel` + `HasField` instances. Typos are type errors, not runtime lookups.
 
-3. **Auto-detected clock and reset** — the `ClockReset` derived class scans field names against conventions (`clock*`, `clk*`, `reset*`, `rst*`, `*_n` = active-low). A user with unconventional names overrides explicitly:
+1. **Auto-detected clock and reset** — the `ClockReset` derived class scans field names against conventions (`clock*`, `clk*`, `reset*`, `rst*`, `*_n` = active-low). A user with unconventional names overrides explicitly:
+
    ```haskell
    instance ClockReset BlinkyPorts where
      clockPort = #clock_50
      resetPort = ActiveLow #key0
    ```
 
-4. **Hspec-style expectations** — `shouldBe`, `shouldSatisfy`, `shouldBeIn`, `shouldChange`. Each works both as a direct call and as a Hedgehog/QuickCheck property body.
+1. **Hspec-style expectations** — `shouldBe`, `shouldSatisfy`, `shouldBeIn`, `shouldChange`. Each works both as a direct call and as a Hedgehog/QuickCheck property body.
+
    ```haskell
    #ledr `shouldBe` 1
    #ledr `shouldSatisfy` (< 128)
    #ledr `shouldChangeAfter` (cycles (2^22))
    ```
 
-5. **Readable time units** — `cycles n`, `for (cycles n)`, `until (sig `shouldBe` 1)`. No raw integers-with-comments-about-what-they-mean.
+1. **Readable time units** — `cycles n`, `for (cycles n)`, `until (sig `shouldBe` 1)`. No raw integers-with-comments-about-what-they-mean.
+
    ```haskell
    cycles 10
    for (cycles 100) (tick >> log "still going")
    until (#ledr `shouldEqual` 0xFF) tick
    ```
 
-6. **Driving inputs** — assignment syntax via `(.=) :: Label name -> value -> SimM ()`:
+1. **Driving inputs** — assignment syntax via `(.=) :: Label name -> value -> SimM ()`:
+
    ```haskell
    #key0 .= low
    #clock_50 .= high     -- rare; usually you want `cycles` not manual clocking
    ```
+
    or bulk-set via an HKD value:
+
    ```haskell
    drive $ allPorts { key0 = high, clock_50 = low }
    ```
 
-7. **VCD tracing as a bracket** — no mandatory argument threading:
+1. **VCD tracing as a bracket** — no mandatory argument threading:
+
    ```haskell
    main = runSim @BlinkyPorts "Blinky" do
      withTrace "blinky.vcd" do    -- all `cycles` inside emit to VCD
@@ -311,7 +330,8 @@ That's the whole thing. No pointer types, no `peekOutputs`, no HKD pattern-match
        cycles 20_000
    ```
 
-8. **Property testing**, first-class:
+1. **Property testing**, first-class:
+
    ```haskell
    prop_ledr_increments :: Property
    prop_ledr_increments = property $ runSim @BlinkyPorts "Blinky" do
@@ -321,11 +341,12 @@ That's the whole thing. No pointer types, no `peekOutputs`, no HKD pattern-match
      #ledr `shouldBe` fromIntegral (n .&. 0xFF)
    ```
 
-9. **Introspection** — `peekAll :: SimM (AllPorts Identity)` returns the whole HKD record if a user wants it; but the common case uses per-port `#label` access and never touches the record as a value.
+1. **Introspection** — `peekAll :: SimM (AllPorts Identity)` returns the whole HKD record if a user wants it; but the common case uses per-port `#label` access and never touches the record as a value.
 
 ### Why a monad instead of a free algebra / applicative
 
 Considered alternatives:
+
 - **Free monad / freer** — pretty, but the cost is poor error messages and hard-to-inspect call stacks. Not worth it for this domain.
 - **Applicative-only DSL** — would allow ahead-of-time optimisation of testbenches, but hardware testbenches inherently depend on observed values (branch on `peek` result, loop until a condition), so an applicative is too weak.
 - **Indexed monads / linear types** — buys type-level guarantees like "you haven't deassertReset before reading output", but the complexity tax on users is steep.
@@ -337,14 +358,14 @@ Concrete `ReaderT SimEnv IO` wins on: IDE tooling works perfectly, stack traces 
 `"Blinky"` in `runSim @BlinkyPorts "Blinky"` is a string identifying a build-time artifact. At `cabal build`:
 
 1. Read the user's `clash-manifest.json` (looked up via custom cabal field `x-verilambda-manifest` pointing at the manifest file).
-2. **Verify the `BlinkyPorts` HKD record matches the manifest at the type level** — field names, widths, directions. Mismatch fails the build with a diff:
+1. **Verify the `BlinkyPorts` HKD record matches the manifest at the type level** — field names, widths, directions. Mismatch fails the build with a diff:
    ```
    Port mismatch between BlinkyPorts and clash-manifest.json:
      field `ledr` declared as `f (BitVector 8)` but manifest says width=7
    ```
-3. Run `verilambda-shim-gen --manifest … --port-spec …` to emit `BlinkyShim.{cpp,h}`.
-4. Invoke `verilator --cc --exe --build -CFLAGS='-fPIC'` → `libVBlinky.a`.
-5. Patch `BuildInfo`: add `extra-libs`, `extra-lib-dirs`, `include-dirs`.
+1. Run `verilambda-shim-gen --manifest … --port-spec …` to emit `BlinkyShim.{cpp,h}`.
+1. Invoke `verilator --cc --exe --build -CFLAGS='-fPIC'` → `libVBlinky.a`.
+1. Patch `BuildInfo`: add `extra-libs`, `extra-lib-dirs`, `include-dirs`.
 
 User's Haskell code sees only the clean API; codegen is invisible except in build output.
 
@@ -389,15 +410,15 @@ No pattern matches on the HKD, no explicit pointer handling, the DUT identifier 
 The git repo at `/home/mika/verilambda/` is pre-created and empty (no commits yet). I execute in this exact order, one clean commit per logical unit:
 
 1. **Copy this plan to `PLAN.md`** in the repo root. This is step zero — the plan goes into the repo as its own file before code does, so we can reference it throughout.
-2. **Write `README.md`** — concise project pitch (name, tagline, 5-line example, license badges, install-from-Hackage note). **Commit as "Initial README"** — this is the first commit of the repo; it contains README.md only.
-3. Second commit: `PLAN.md` + `LICENSE-MIT` + `LICENSE-BSD` + `.gitignore` (Haskell + Nix exclusions). Commit message: "Project charter and license texts".
-4. Third commit: `flake.nix` + `nix/` skeleton from alterade2-flake's pattern. Commit: "Add flake.parts skeleton".
-5. Fourth commit: empty `verilambda.cabal` + `Setup.hs` stub + `src/Verilambda.hs` with a stub `module Verilambda where` so `cabal build` resolves trivially. Commit: "Cabal skeleton".
-6. Subsequent commits: add modules in order of dependency (`Types.hs`, `Manifest.hs`, `Ports.hs`, `Storable.hs`, `FFI.hs`, `Sim.hs`, `Trace.hs`). One commit per module with its accompanying tests. Message shape: "Add Verilambda.Manifest with parsing + property tests".
-7. Commits for `shim-gen/` (CLI, template, ManifestToPorts).
-8. Commits for each example (`blinky`, `fifo`, `mux`) — each a single commit adding the design, test, and manifest together.
-9. Final MVP commit: "Integrate with alterade2-flake as de2-blinky-sim-hs" — in that other repo, adds the new sim package.
-10. Tag v0.1.0 when `nix flake check` + `cabal test --enable-coverage` + integration in alterade2-flake all pass.
+1. **Write `README.md`** — concise project pitch (name, tagline, 5-line example, license badges, install-from-Hackage note). **Commit as "Initial README"** — this is the first commit of the repo; it contains README.md only.
+1. Second commit: `PLAN.md` + `LICENSE-MIT` + `LICENSE-BSD` + `.gitignore` (Haskell + Nix exclusions). Commit message: "Project charter and license texts".
+1. Third commit: `flake.nix` + `nix/` skeleton from alterade2-flake's pattern. Commit: "Add flake.parts skeleton".
+1. Fourth commit: empty `verilambda.cabal` + `Setup.hs` stub + `src/Verilambda.hs` with a stub `module Verilambda where` so `cabal build` resolves trivially. Commit: "Cabal skeleton".
+1. Subsequent commits: add modules in order of dependency (`Types.hs`, `Manifest.hs`, `Ports.hs`, `Storable.hs`, `FFI.hs`, `Sim.hs`, `Trace.hs`). One commit per module with its accompanying tests. Message shape: "Add Verilambda.Manifest with parsing + property tests".
+1. Commits for `shim-gen/` (CLI, template, ManifestToPorts).
+1. Commits for each example (`blinky`, `fifo`, `mux`) — each a single commit adding the design, test, and manifest together.
+1. Final MVP commit: "Integrate with alterade2-flake as de2-blinky-sim-hs" — in that other repo, adds the new sim package.
+1. Tag v0.1.0 when `nix flake check` + `cabal test --enable-coverage` + integration in alterade2-flake all pass.
 
 Rule: **every commit leaves the tree in a buildable state.** `cabal build` and `nix flake check` both succeed at every point in history. No WIP commits merged; squash locally if exploration is messy.
 
@@ -461,6 +482,7 @@ And `pkgs/default.nix` builds the Haskell test as a Cabal project using `haskell
 ## MVP scope
 
 **In**:
+
 - `Bit`, `BitVector n` port types (the 95% case)
 - Single clock domain
 - Explicit step / runFor / reset combinators
@@ -470,6 +492,7 @@ And `pkgs/default.nix` builds the Haskell test as a Cabal project using `haskell
 - Works on Linux (macOS in theory, defer actual testing)
 
 **Deliberately out**:
+
 - Multi-clock domains (stub with `Unsupported` error; implement in v0.2)
 - `Signed n` / `Unsigned n` port types (add before v0.1 if cheap)
 - InOut ports / tristate
@@ -492,27 +515,30 @@ And `pkgs/default.nix` builds the Haskell test as a Cabal project using `haskell
 ## Verification
 
 1. **Tasty test suite** (`cabal test --enable-coverage`):
+
    - `test/Verilambda/ManifestSpec.hs` — HUnit + golden: given sample `clash-manifest.json` inputs, expect fixed parsed-port structures.
    - `test/Verilambda/PortsSpec.hs` — Hedgehog properties: HKD reflection roundtrips, `PortsOf` class produces the field list matching `Generic`.
    - `test/Verilambda/StorableSpec.hs` — QuickCheck (via tasty-quickcheck): random port records roundtrip through `peek`/`poke` byte-identically.
    - `test/Verilambda/SimSpec.hs` — integration: for each example, builds the shim via shim-gen, invokes Verilator, opens the sim, steps it, checks outputs.
    - `test/ShimGenSpec.hs` — `tasty-golden`: lock the emitted C++ byte-for-byte so refactors to shim-gen don't silently change codegen.
 
-2. **Coverage enforcement**:
+1. **Coverage enforcement**:
+
    - `cabal test --enable-coverage` produces `.tix` files per test component.
    - A small script under `nix/checks.nix` runs `hpc markup` and fails if combined coverage drops below 90%.
    - Target 100% on `Verilambda.Manifest`, `Verilambda.Ports`, `Verilambda.Storable` (pure modules, no excuse); 80%+ on `Verilambda.Sim`, `Verilambda.Trace` (IO-heavy, harder to cover).
 
-3. **Examples-are-tests**: each `examples/<name>/` has its own `cabal test` target. The root `verilambda.cabal` lists them via `common-stanza` so a single `cabal test all` runs the library tests + every example's assertions.
+1. **Examples-are-tests**: each `examples/<name>/` has its own `cabal test` target. The root `verilambda.cabal` lists them via `common-stanza` so a single `cabal test all` runs the library tests + every example's assertions.
 
-4. **Dogfood test** (in alterade2-flake):
+1. **Dogfood test** (in alterade2-flake):
+
    - `nix build .#de2-blinky-sim-hs`
    - `nix run .#de2-blinky-sim-hs` — exits 0, prints the same 4 LEDR transitions Verilator (`de2-blinky-sim`) and GHDL (`de2-blinky-sim-ghdl`) sims print.
    - `diff` the three sims' transition tables byte-for-byte (except format framing).
 
-5. **Multi-GHC smoke check**: `nix flake check --impure` with a matrix `[ghc9103, ghc9124]` devShells, both should build.
+1. **Multi-GHC smoke check**: `nix flake check --impure` with a matrix `[ghc9103, ghc9124]` devShells, both should build.
 
-6. **`nix flake check`** passes on verilambda itself + on alterade2-flake with the new input.
+1. **`nix flake check`** passes on verilambda itself + on alterade2-flake with the new input.
 
 ## Risks & fallbacks
 
@@ -532,29 +558,31 @@ Alongside the library work, write a scientific-style article for the Pure Fun So
 **File location**: `src/blog/posts/building-verilator-haskell-bindings.md` (slug matches the branch intent). Following the convention set by the existing `src/blog/posts/hello-world.md`.
 
 **Registration**: after writing the article, also:
+
 1. Add the post to `src/blog/mod.rs` (metadata: title, date, slug, summary)
-2. Register it in the project's build script (follows the pattern established for `hello-world`)
-3. Verify the Yew frontend builds clean via the repo's standard build
+1. Register it in the project's build script (follows the pattern established for `hello-world`)
+1. Verify the Yew frontend builds clean via the repo's standard build
 
 **Article structure** — proper scientific article style, not the looser hello-world.md shape:
 
 1. **Abstract** — 3–4 sentences only. States the contribution (new Haskell/Verilator bridge `verilambda`), the motivation (clashilator abandoned, ergonomics gap), and the concrete result (Blinky counter round-trips from Haskell source to LEDs on an Altera DE2 Cyclone II FPGA).
 
-2. **Introduction** — short but a little longer than the abstract. 2–3 paragraphs. Context: FPGA development on NixOS in 2026, the Clash language, why simulation matters, what's broken in the current Haskell↔Verilator story.
+1. **Introduction** — short but a little longer than the abstract. 2–3 paragraphs. Context: FPGA development on NixOS in 2026, the Clash language, why simulation matters, what's broken in the current Haskell↔Verilator story.
 
-3. **Background** — Clash, Verilator, the alterade2-flake project as predecessor work, how Clash emits Verilog and Verilator compiles it to fast C++. Brief tour of existing options (clashilator, clash-cosim, marlin-verilator in Rust) and why each is insufficient.
+1. **Background** — Clash, Verilator, the alterade2-flake project as predecessor work, how Clash emits Verilog and Verilator compiles it to fast C++. Brief tour of existing options (clashilator, clash-cosim, marlin-verilator in Rust) and why each is insufficient.
 
-4. **Design** — the verilambda approach. Type-based eDSL (no TH), HKD port records via barbies, `SimM` monad, overloaded labels for ports, hspec-flavoured expectations, `clash-manifest.json` as the metadata source. Side-by-side comparison of clashilator's and verilambda's API at a small example.
+1. **Design** — the verilambda approach. Type-based eDSL (no TH), HKD port records via barbies, `SimM` monad, overloaded labels for ports, hspec-flavoured expectations, `clash-manifest.json` as the metadata source. Side-by-side comparison of clashilator's and verilambda's API at a small example.
 
-5. **Implementation** — three-layer architecture: (i) HKD port records in user's Haskell, (ii) build-time shim generator emitting a C ABI, (iii) `SimM` monad exposing a nice API over the shim. Mention the dual support for `build-type: Custom` and `build-type: Hooks`.
+1. **Implementation** — three-layer architecture: (i) HKD port records in user's Haskell, (ii) build-time shim generator emitting a C ABI, (iii) `SimM` monad exposing a nice API over the shim. Mention the dual support for `build-type: Custom` and `build-type: Hooks`.
 
-6. **Evaluation** — the Blinky demonstration. Haskell source → Clash → Verilog → Verilator sim + Quartus synthesis → bitstream → DE2 board LEDs counting at 12 Hz. Include the transition-table byte-for-byte match between the Haskell, C++, and VHDL simulators and the physical board.
+1. **Evaluation** — the Blinky demonstration. Haskell source → Clash → Verilog → Verilator sim + Quartus synthesis → bitstream → DE2 board LEDs counting at 12 Hz. Include the transition-table byte-for-byte match between the Haskell, C++, and VHDL simulators and the physical board.
 
-7. **Related Work** — brief, one paragraph each: clashilator (the prior art we replace), marlin-verilator (Rust equivalent that inspired several design choices), clash-cosim (complementary, not competing), inline-verilog (Mazzoli, 2025).
+1. **Related Work** — brief, one paragraph each: clashilator (the prior art we replace), marlin-verilator (Rust equivalent that inspired several design choices), clash-cosim (complementary, not competing), inline-verilog (Mazzoli, 2025).
 
-8. **Summary & Conclusions** — recap the contribution, emphasise the ergonomic gain ("10-line testbenches instead of 50"), identify future work (multi-clock domains, macOS port, Hackage publication).
+1. **Summary & Conclusions** — recap the contribution, emphasise the ergonomic gain ("10-line testbenches instead of 50"), identify future work (multi-clock domains, macOS port, Hackage publication).
 
 **Style notes**:
+
 - Writing register: neutral, descriptive, avoids first-person plural unless necessary. Passive voice acceptable where it reads naturally (matches the hello-world.md tone).
 - Include at least one ASCII pipeline diagram (like hello-world.md's markdown→WASM flow) showing the Clash→Verilator→DE2 pipeline.
 - Include one side-by-side code snippet comparing clashilator and verilambda at the same task.
