@@ -29,6 +29,7 @@ module Verilambda.Types (
 where
 
 import Clash.Prelude (Bit, BitVector, Signed, Unsigned, high, low)
+import Data.Aeson (FromJSON (parseJSON), Value (String))
 
 -- | Direction of a DUT port, as recorded in the Clash manifest.
 data Direction
@@ -39,6 +40,16 @@ data Direction
   | -- | Bidirectional (tristate). Not supported in the v0.1 MVP.
     InOut
   deriving stock (Show, Read, Eq, Ord, Bounded, Enum)
+
+-- The manifest encodes direction as lowercase "in"/"out"/"inout"; map
+-- that back onto our Haskell enum. Lives here rather than in
+-- Verilambda.Manifest to avoid an orphan instance.
+instance FromJSON Direction where
+  parseJSON = \case
+    String "in" -> pure In
+    String "out" -> pure Out
+    String "inout" -> pure InOut
+    v -> fail $ "expected direction string (in/out/inout), got: " <> show v
 
 -- | Swap input/output. 'InOut' is fixed under this operation.
 flipDirection :: Direction -> Direction

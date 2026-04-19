@@ -42,12 +42,11 @@ import Data.Aeson (
   (.:),
   (.:?),
  )
-import Data.Aeson.Types (Parser)
 import Data.ByteString qualified as BS
 import Data.Map.Strict (Map)
 import Data.Text (Text)
 import GHC.IO.Exception (IOErrorType (InappropriateType), IOException (..))
-import Verilambda.Types (Direction (..))
+import Verilambda.Types (Direction)
 
 {- | Top-level manifest. Only the fields the library uses today are
 modelled; additional fields in a future Clash release are ignored.
@@ -102,14 +101,8 @@ instance FromJSON Port where
       <*> o .:? "domain"
       <*> o .:? "type_name" .!= ""
 
--- The manifest encodes direction as lowercase "in"/"out"/"inout"; map that
--- back onto our Haskell enum.
-instance FromJSON Direction where
-  parseJSON = \case
-    String "in" -> pure In
-    String "out" -> pure Out
-    String "inout" -> pure InOut
-    v -> fail $ "expected direction string (in/out/inout), got: " <> show v
+-- (FromJSON Direction lives in Verilambda.Types, alongside the data
+-- declaration, to avoid an orphan instance.)
 
 {- | A clock domain as declared in the manifest. Captures enough to drive
  the SimM monad's default clock behaviour.

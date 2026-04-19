@@ -6,6 +6,7 @@ module Main (main) where
 
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Verilambda.ManifestSpec qualified
+import Verilambda.PortsSpec qualified
 import Verilambda.TypesSpec qualified
 
 main :: IO ()
@@ -17,4 +18,5 @@ allTests =
     "verilambda"
     [ Verilambda.TypesSpec.tests
     , Verilambda.ManifestSpec.tests
+    , Verilambda.PortsSpec.tests
     ]
