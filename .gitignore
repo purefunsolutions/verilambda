@@ -1,0 +1,42 @@
+# SPDX-FileCopyrightText: 2026 Mika Tammi
+# SPDX-License-Identifier: MIT OR BSD-3-Clause
+
+# Haskell / Cabal
+dist/
+dist-*/
+dist-newstyle/
+.ghc.environment.*
+cabal.project.local
+.stack-work/
+*.hi
+*.o
+*.dyn_hi
+*.dyn_o
+*.chi
+*.chs.h
+*.hp
+*.prof
+*.aux
+*.tix
+.hpc/
+
+# HLS
+.hie/
+
+# Nix
+result
+result-*
+.direnv/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# Simulation output (emitted by examples / tests)
+*.vcd
+*.fst
+obj_dir/
