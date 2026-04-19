@@ -45,19 +45,25 @@ common warnings
 common language
   default-language:   GHC2021
   default-extensions:
+    AllowAmbiguousTypes
     DataKinds
+    DefaultSignatures
     DeriveAnyClass
     DerivingStrategies
+    FlexibleInstances
     LambdaCase
+    MultiParamTypeClasses
     OverloadedStrings
     RecordWildCards
     TypeFamilies
+    UndecidableInstances
 
 library
   import:          warnings, language
   exposed-modules:
     Verilambda
     Verilambda.Manifest
+    Verilambda.Ports
     Verilambda.Types
 
   build-depends:
@@ -76,12 +82,14 @@ test-suite verilambda-test
   main-is:        Main.hs
   other-modules:
     Verilambda.ManifestSpec
+    Verilambda.PortsSpec
     Verilambda.TypesSpec
 
   hs-source-dirs: test
   build-depends:
     , base
     , bytestring
+    , clash-prelude
     , containers
     , hedgehog        >=1.4  && <2
     , tasty           >=1.5  && <1.6

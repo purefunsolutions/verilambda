@@ -45,34 +45,38 @@ test_parseBlinky = do
       length (topPorts (manifestTopComponent m)) @?= 3
 
       -- Each port is exactly what Clash generated for the DE2 Blinky.
-      let [p0, p1, p2] = topPorts (manifestTopComponent m)
-      p0
-        @?= Port
-          { portName = "CLOCK_50"
-          , portDirection = In
-          , portWidth = 1
-          , portIsClock = True
-          , portDomain = Just "Dom50"
-          , portTypeName = ""
-          }
-      p1
-        @?= Port
-          { portName = "KEY0"
-          , portDirection = In
-          , portWidth = 1
-          , portIsClock = False
-          , portDomain = Just "Dom50"
-          , portTypeName = ""
-          }
-      p2
-        @?= Port
-          { portName = "LEDR"
-          , portDirection = Out
-          , portWidth = 8
-          , portIsClock = False
-          , portDomain = Nothing
-          , portTypeName = "[7:0]"
-          }
+      case topPorts (manifestTopComponent m) of
+        [p0, p1, p2] -> do
+          p0
+            @?= Port
+              { portName = "CLOCK_50"
+              , portDirection = In
+              , portWidth = 1
+              , portIsClock = True
+              , portDomain = Just "Dom50"
+              , portTypeName = ""
+              }
+          p1
+            @?= Port
+              { portName = "KEY0"
+              , portDirection = In
+              , portWidth = 1
+              , portIsClock = False
+              , portDomain = Just "Dom50"
+              , portTypeName = ""
+              }
+          p2
+            @?= Port
+              { portName = "LEDR"
+              , portDirection = Out
+              , portWidth = 8
+              , portIsClock = False
+              , portDomain = Nothing
+              , portTypeName = "[7:0]"
+              }
+        other ->
+          assertFailure $
+            "expected 3 ports, got " <> show (length other)
 
       -- Dom50 is the DE2's 50 MHz, async active-low — matches Blinky.hs.
       case Map.lookup "Dom50" (manifestDomains m) of
