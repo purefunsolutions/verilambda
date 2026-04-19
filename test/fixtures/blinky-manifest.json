@@ -1,0 +1,86 @@
+{
+    "components": [
+        "blinky"
+    ],
+    "dependencies": {
+        "transitive": []
+    },
+    "domains": {
+        "Dom50": {
+            "active_edge": "Rising",
+            "init_behavior": "Defined",
+            "period": 20000,
+            "reset_kind": "Asynchronous",
+            "reset_polarity": "ActiveLow"
+        },
+        "IntelSystem": {
+            "active_edge": "Rising",
+            "init_behavior": "Defined",
+            "period": 10000,
+            "reset_kind": "Asynchronous",
+            "reset_polarity": "ActiveHigh"
+        },
+        "System": {
+            "active_edge": "Rising",
+            "init_behavior": "Defined",
+            "period": 10000,
+            "reset_kind": "Asynchronous",
+            "reset_polarity": "ActiveHigh"
+        },
+        "XilinxSystem": {
+            "active_edge": "Rising",
+            "init_behavior": "Defined",
+            "period": 10000,
+            "reset_kind": "Synchronous",
+            "reset_polarity": "ActiveHigh"
+        }
+    },
+    "files": [
+        {
+            "name": "blinky_shim.cpp",
+            "sha256": "7123a56e67a593df873986fc715e70c20f2bedfcee6f459404e162bbc0450a75"
+        },
+        {
+            "name": "blinky.sdc",
+            "sha256": "f20489dae88a4b72e9319bd47588567b35489e8f4ed9b26351b1eeafa4335f43"
+        },
+        {
+            "name": "blinky.v",
+            "sha256": "b527150303c1e2309486dd84bac8b76e6236e2dc0874da700779498dd293dd30"
+        }
+    ],
+    "flags": [
+        20,
+        20
+    ],
+    "hash": "65c82cf6f22108159f79b36e833b55ce61eace87865d90e1c092a680db427341",
+    "top_component": {
+        "name": "blinky",
+        "ports_flat": [
+            {
+                "direction": "in",
+                "domain": "Dom50",
+                "is_clock": true,
+                "name": "CLOCK_50",
+                "type_name": "",
+                "width": 1
+            },
+            {
+                "direction": "in",
+                "domain": "Dom50",
+                "is_clock": false,
+                "name": "KEY0",
+                "type_name": "",
+                "width": 1
+            },
+            {
+                "direction": "out",
+                "is_clock": false,
+                "name": "LEDR",
+                "type_name": "[7:0]",
+                "width": 8
+            }
+        ]
+    },
+    "version": "unstable"
+}

@@ -60,11 +60,16 @@ library
   import:          warnings, language
   exposed-modules:
     Verilambda
+    Verilambda.Manifest
     Verilambda.Types
 
   build-depends:
+    , aeson          >=2.2  && <2.3
     , base           >=4.20 && <5
+    , bytestring     >=0.12 && <0.13
     , clash-prelude  ^>=1.8
+    , containers     >=0.7  && <0.9
+    , text           >=2.1  && <2.2
 
   hs-source-dirs:  src
 
@@ -72,10 +77,15 @@ test-suite verilambda-test
   import:         warnings, language
   type:           exitcode-stdio-1.0
   main-is:        Main.hs
-  other-modules:  Verilambda.TypesSpec
+  other-modules:
+    Verilambda.ManifestSpec
+    Verilambda.TypesSpec
+
   hs-source-dirs: test
   build-depends:
     , base
+    , bytestring
+    , containers
     , hedgehog        >=1.4  && <2
     , tasty           >=1.5  && <1.6
     , tasty-hedgehog  >=1.4  && <1.5
