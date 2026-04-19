@@ -3,17 +3,17 @@
 
 {- | Pure text templates for the C++ shim.
 
-Keeping the templates in Haskell strings rather than Mustache / Shakespeare
-means we pay the cost of a little manual escaping in exchange for:
+The shim exposes a narrow C ABI per DUT:
 
-  * no extra runtime dependency,
-  * clear line-by-line reading of what the shim will emit,
-  * easy golden-testing via @tasty-golden@.
+  * @verilambda_<top>_new@ / @verilambda_<top>_delete@  — lifecycle
+  * @verilambda_<top>_step@                             — transfer state + eval
+  * @verilambda_<top>_trace_*@                          — VCD plumbing
 
-The templates are parameterised by the DUT's top-module name and flat
-port list (see 'Verilambda.Manifest.Port'). Direction determines whether
-we emit a setter (In) or a getter (Out); InOut is flagged as an error in
-the MVP.
+Signal transfer is atomic through a single packed struct of all the DUT's
+ports. Inputs are written to the model before @eval()@; outputs (and the
+echo of inputs) are read back afterwards. One foreign import on the
+Haskell side handles every DUT — no per-port FFI code generation is
+needed.
 -}
 module Verilambda.ShimGen.CppTemplate (
   renderShimHeader,
@@ -37,9 +37,7 @@ data ShimGenInput = ShimGenInput
 
 -- * Header
 
-{- | Render the C-ABI header that downstream tooling (our Haskell FFI
- module, user-written wrappers) consumes.
--}
+-- | Render the C-ABI header.
 renderShimHeader :: ShimGenInput -> Text
 renderShimHeader ShimGenInput {..} =
   Text.unlines $
@@ -56,17 +54,31 @@ renderShimHeader ShimGenInput {..} =
     , ""
     , "typedef void* VerilambdaSim;"
     , ""
-    , "VerilambdaSim verilambda_" <> lowerTop <> "_new(void);"
-    , "void verilambda_" <> lowerTop <> "_delete(VerilambdaSim sim);"
-    , "void verilambda_" <> lowerTop <> "_eval(VerilambdaSim sim);"
-    , "void verilambda_" <> lowerTop <> "_final(VerilambdaSim sim);"
-    , ""
+    , "/* Packed state of every port. Passed into step() with inputs filled"
+    , " * in; step() overwrites it with the post-eval values of every port."
+    , " * Fields are in declaration order; this must match the user's HKD"
+    , " * record layout."
+    , " */"
+    , "typedef struct {"
     ]
-      <> fmap (headerPortAccessor lowerTop) sgiPorts
-      <> [ ""
+      <> fmap portStructField sgiPorts
+      <> [ "} verilambda_" <> lowerTop <> "_state_t;"
+         , ""
+         , "VerilambdaSim verilambda_" <> lowerTop <> "_new(void);"
+         , "void verilambda_" <> lowerTop <> "_delete(VerilambdaSim sim);"
+         , ""
+         , "/* Copy in.inputs → model, eval, copy every port → out."
+         , " * in and out may alias. */"
+         , "void verilambda_" <> lowerTop <> "_step("
+         , "    VerilambdaSim sim,"
+         , "    const verilambda_" <> lowerTop <> "_state_t* in,"
+         , "    verilambda_" <> lowerTop <> "_state_t* out);"
+         , ""
          , "void verilambda_" <> lowerTop <> "_trace_open(VerilambdaSim sim, const char* path);"
          , "void verilambda_" <> lowerTop <> "_trace_close(VerilambdaSim sim);"
          , "void verilambda_" <> lowerTop <> "_trace_dump(VerilambdaSim sim, uint64_t time);"
+         , ""
+         , "void verilambda_" <> lowerTop <> "_final(VerilambdaSim sim);"
          , ""
          , "#ifdef __cplusplus"
          , "}"
@@ -77,34 +89,11 @@ renderShimHeader ShimGenInput {..} =
   lowerTop = Text.toLower sgiTopName
   upperTop = Text.toUpper sgiTopName
 
-headerPortAccessor :: Text -> Port -> Text
-headerPortAccessor top p =
-  case portDirection p of
-    In ->
-      "void verilambda_"
-        <> top
-        <> "_set_"
-        <> portName p
-        <> "(VerilambdaSim sim, "
-        <> cTypeFor (portWidth p)
-        <> " value);"
-    Out ->
-      cTypeFor (portWidth p)
-        <> " verilambda_"
-        <> top
-        <> "_get_"
-        <> portName p
-        <> "(VerilambdaSim sim);"
-    InOut ->
-      "/* INOUT port "
-        <> portName p
-        <> " not supported in verilambda v0.1 MVP */"
+portStructField :: Port -> Text
+portStructField p = "  " <> cTypeFor (portWidth p) <> " " <> portName p <> ";"
 
 -- * Source
 
-{- | Render the C++ source that wraps the Verilator-generated @V<top>@
- class behind the C ABI declared in the header.
--}
 renderShimSource :: ShimGenInput -> Text
 renderShimSource ShimGenInput {..} =
   Text.unlines $
@@ -144,17 +133,18 @@ renderShimSource ShimGenInput {..} =
     , "  delete static_cast<Wrapper*>(sim);"
     , "}"
     , ""
-    , "void verilambda_" <> lowerTop <> "_eval(VerilambdaSim sim) {"
-    , "  static_cast<Wrapper*>(sim)->top->eval();"
-    , "}"
-    , ""
-    , "void verilambda_" <> lowerTop <> "_final(VerilambdaSim sim) {"
-    , "  static_cast<Wrapper*>(sim)->top->final();"
-    , "}"
-    , ""
+    , "void verilambda_" <> lowerTop <> "_step("
+    , "    VerilambdaSim sim,"
+    , "    const verilambda_" <> lowerTop <> "_state_t* in,"
+    , "    verilambda_" <> lowerTop <> "_state_t* out) {"
+    , "  auto* w = static_cast<Wrapper*>(sim);"
     ]
-      <> concatMap (sourcePortAccessor lowerTop) sgiPorts
-      <> [ ""
+      <> fmap writeInputLine sgiPorts
+      <> [ "  w->top->eval();"
+         ]
+      <> fmap readPortLine sgiPorts
+      <> [ "}"
+         , ""
          , "void verilambda_" <> lowerTop <> "_trace_open(VerilambdaSim sim, const char* path) {"
          , "  auto* w = static_cast<Wrapper*>(sim);"
          , "  if (w->trace) return;"
@@ -173,8 +163,12 @@ renderShimSource ShimGenInput {..} =
          , ""
          , "void verilambda_" <> lowerTop <> "_trace_dump(VerilambdaSim sim, uint64_t t) {"
          , "  auto* w = static_cast<Wrapper*>(sim);"
-         , "  if (w->trace) w->trace->dump(t);"
+         , "  if (w->trace) { w->trace->dump(t); }"
          , "  w->time = t;"
+         , "}"
+         , ""
+         , "void verilambda_" <> lowerTop <> "_final(VerilambdaSim sim) {"
+         , "  static_cast<Wrapper*>(sim)->top->final();"
          , "}"
          , ""
          , "}  // extern \"C\""
@@ -182,33 +176,16 @@ renderShimSource ShimGenInput {..} =
  where
   lowerTop = Text.toLower sgiTopName
 
-sourcePortAccessor :: Text -> Port -> [Text]
-sourcePortAccessor top p =
-  case portDirection p of
-    In ->
-      [ "void verilambda_"
-          <> top
-          <> "_set_"
-          <> portName p
-          <> "(VerilambdaSim sim, "
-          <> cTypeFor (portWidth p)
-          <> " value) {"
-      , "  static_cast<Wrapper*>(sim)->top->" <> portName p <> " = value;"
-      , "}"
-      , ""
-      ]
-    Out ->
-      [ cTypeFor (portWidth p)
-          <> " verilambda_"
-          <> top
-          <> "_get_"
-          <> portName p
-          <> "(VerilambdaSim sim) {"
-      , "  return static_cast<Wrapper*>(sim)->top->" <> portName p <> ";"
-      , "}"
-      , ""
-      ]
-    InOut -> ["/* INOUT port " <> portName p <> " not supported */"]
+  writeInputLine :: Port -> Text
+  writeInputLine p = case portDirection p of
+    In -> "  w->top->" <> portName p <> " = in->" <> portName p <> ";"
+    Out -> "  /* " <> portName p <> " is an output — not driven from in */"
+    InOut -> "  /* " <> portName p <> " InOut not supported in v0.1 */"
+
+  readPortLine :: Port -> Text
+  readPortLine p = case portDirection p of
+    InOut -> "  /* " <> portName p <> " InOut not supported in v0.1 */"
+    _ -> "  out->" <> portName p <> " = w->top->" <> portName p <> ";"
 
 -- * Shared helpers
 
@@ -221,8 +198,7 @@ hdrCopyright =
     ]
 
 {- | Map a port's bit-width to the smallest C integer type Verilator
- would pick for it. Matches Verilator's own conventions for
- @IData@/@QData@ selection.
+ would pick for it. Matches Verilator's own IData/QData conventions.
 -}
 cTypeFor :: Int -> Text
 cTypeFor w
