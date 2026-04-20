@@ -100,57 +100,174 @@ Or clone locally and reference via `cabal.project`:
 packages: . /path/to/verilambda
 ```
 
-## Integration: `build-type: Custom`
+## Using verilambda in your Clash project
 
-A downstream Haskell project can integrate the shim-gen + verilator
-pipeline into `cabal build` via a small `Setup.hs`:
+Drop verilambda into an existing Clash project in three steps:
+
+1. Let Clash emit Verilog + `clash-manifest.json` next to your design.
+1. Pick one of the two integration modes below. Both wrap the same
+   pure pipeline in `Verilambda.BuildDriver` (shim-gen → Verilator →
+   `libV<top>.a`), injected into your binary via `extra-lib-dirs` +
+   `extra-libs` at link time.
+1. Write your testbench against the `Verilambda` API.
+
+Either mode expects `verilambda-shim-gen` and `verilator` (≥ 5.040) on
+`$PATH` at `cabal build` time. The flake's devShell
+(`nix develop github:purefunsolutions/verilambda`) supplies both.
+
+A reference project lives at [`examples/blinky/`](./examples/blinky) —
+the Blinky counter from [alterade2-flake](https://github.com/purefunsolutions/alterade2-flake)
+wired end-to-end through verilambda.
+
+### Project layout
+
+```
+my-dut/
+├── my-dut.cabal
+├── cabal.project
+├── Setup.hs              # classic Custom path, see below
+├── SetupHooks.hs         # or: modern Hooks path, see below
+├── src/
+│   └── MyDut.hs          # your Clash design
+├── verilog/
+│   └── my_dut.v          # Clash-emitted: `clash --verilog MyDut`
+├── clash-manifest.json   # Clash-emitted alongside the Verilog
+└── test/
+    └── Main.hs           # your verilambda testbench
+```
+
+### Classic `build-type: Custom` (Cabal 3.0+, any GHC ≥ 9.10)
+
+This is the integration path shipped in `v0.1.0`. Tested end-to-end
+against GHC 9.10.3 / Cabal 3.12 and GHC 9.12.2 / Cabal 3.14.
+
+Your `my-dut.cabal`:
+
+```cabal
+cabal-version: 3.0
+name:          my-dut
+version:       0.1.0
+build-type:    Custom
+
+custom-setup
+  setup-depends:
+    , base
+    , Cabal       >= 3.0 && < 4
+    , directory
+    , process
+    , verilambda
+
+test-suite my-dut-test
+  type:           exitcode-stdio-1.0
+  main-is:        Main.hs
+  hs-source-dirs: test
+  build-depends:
+    , base
+    , clash-prelude
+    , verilambda
+```
+
+Your `Setup.hs` (four lines of wiring + three lines of DUT-specific
+config):
 
 ```haskell
--- Setup.hs
 module Main (main) where
-import Verilambda.Setup (verilambdaMainWithHooks, defaultBuildConfig, BuildConfig (..))
+
+import Verilambda.Setup (BuildConfig (..), defaultBuildConfig, verilambdaMainWithHooks)
 
 main :: IO ()
 main = verilambdaMainWithHooks defaultBuildConfig
   { bcManifestPath = "clash-manifest.json"
-  , bcTopName      = "blinky"
-  , bcVerilogFiles = [ "verilog/blinky.v" ]
+  , bcTopName      = "my_dut"                   -- lower-cased Verilog module name
+  , bcVerilogFiles = [ "verilog/my_dut.v" ]     -- one or more .v files
   }
 ```
 
-The matching `.cabal` stanza:
+What `verilambdaMainWithHooks` does on your behalf, at `cabal build`:
 
-```
-build-type: Custom
+1. Runs `verilambda-shim-gen --manifest clash-manifest.json --out-dir dist/build/verilambda/cbits/`
+   to produce a type-matched C ABI shim for your DUT.
+1. Invokes `verilator --cc --build --trace -CFLAGS -fPIC` on your
+   Verilog + the generated shim, producing `libVmy_dut.a` +
+   `libverilated.a` under `dist/build/verilambda/obj_dir/`.
+1. Injects `extra-lib-dirs=…/obj_dir` and
+   `extra-libs=Vmy_dut, verilated, stdc++` into every component's
+   `BuildInfo` via a `HookedBuildInfo` return, so GHC's linker picks
+   them up transparently.
+
+The rest of your project stays `build-type: Simple`-shaped — no
+manual configure flags, no `--extra-lib-dirs` on the command line.
+
+### Modern `build-type: Hooks` (Cabal 3.14+, GHC 9.12+) — preview
+
+`build-type: Hooks` lands in verilambda **v0.2**. The planned API
+mirrors the Custom path one-to-one, so code written against
+`Verilambda.Setup` today migrates to `Verilambda.Setup.Hooks` with a
+single `import` change.
+
+Your `my-dut.cabal`:
+
+```cabal
+cabal-version: 3.14
+name:          my-dut
+version:       0.1.0
+build-type:    Hooks
+
 custom-setup
-  setup-depends: base, Cabal >= 3.0, verilambda, directory, process
+  setup-depends:
+    , base
+    , Cabal       >= 3.14 && < 4
+    , verilambda
 ```
 
-`verilambdaMainWithHooks` runs shim-gen + verilator in the pre-build
-hook and injects the resulting `extra-lib-dirs` + `extra-libs` into
-every component's `BuildInfo` automatically. Requires
-`verilambda-shim-gen` and `verilator` on `$PATH` at build time.
+Your `SetupHooks.hs` (no `Setup.hs` needed at all):
 
-A `build-type: Hooks` adapter for Cabal 3.14+ is planned for v0.2 —
-the `Verilambda.BuildDriver` module already factors out the pure
-pipeline so both adapters can share it.
+```haskell
+module SetupHooks (setupHooks) where
+
+import Distribution.Simple.SetupHooks (SetupHooks)
+import Verilambda.Setup.Hooks (BuildConfig (..), defaultBuildConfig, verilambdaSetupHooks)
+
+setupHooks :: SetupHooks
+setupHooks = verilambdaSetupHooks defaultBuildConfig
+  { bcManifestPath = "clash-manifest.json"
+  , bcTopName      = "my_dut"
+  , bcVerilogFiles = [ "verilog/my_dut.v" ]
+  }
+```
+
+Until v0.2 ships, Cabal 3.14+ users should stay on the Custom path
+above — it works unchanged under Cabal 3.14 (CPP-guarded
+`makeSymbolicPath` handles the API difference internally), and CI
+tests it on GHC 9.12.2 (`blinky-sim-ghc912-builds` flake check).
+
+### Writing the testbench
+
+Today, testbenches supply a `SimBackend` value — a record of
+`foreign import ccall` functions against the generated shim's C ABI.
+See [`examples/blinky/src/Main.hs`](./examples/blinky/src/Main.hs) for
+a working end-to-end example (8 FFI declarations, one HKD port record,
+a `SimM` body). v0.2 will fold this boilerplate into `shim-gen`'s
+Haskell-emitting pass, at which point the 10-line example at the top
+of this README becomes the common case.
 
 ## Documentation
 
-- [`PLAN.md`](./PLAN.md) — the design document this project is being built
-  from; covers architecture, module layout, and the road to v0.1.0.
-- `doc/architecture.md` — three-layer explainer with a pipeline diagram
-  (coming with v0.1.0).
-- `doc/integration.md` — decision tree for `build-type: Custom` vs.
-  `build-type: Hooks` downstream (coming with v0.1.0).
-- `examples/` — runnable examples that double as tests.
+- [`PLAN.md`](./PLAN.md) — the design document this project is being
+  built from; covers architecture, module layout, and the road to
+  v0.1.0.
+- [`examples/blinky/`](./examples/blinky) — a runnable reference
+  integration. `nix run .#blinky-sim` prints the LEDR transition table
+  for the Blinky design; `nix flake check` proves it matches
+  byte-for-byte against the Verilator C++ and GHDL VHDL simulators in
+  alterade2-flake.
 
 ## License
 
 Dual-licensed under either of:
 
-- [MIT license](./LICENSE-MIT)
-- [BSD-3-Clause license](./LICENSE-BSD)
+- [MIT license](./LICENSES/MIT.txt)
+- [BSD-3-Clause license](./LICENSES/BSD-3-Clause.txt)
 
 at your option.
 
