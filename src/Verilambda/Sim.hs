@@ -125,7 +125,13 @@ tick = SimM $ do
         writeIORef seStateRef s'
         t <- readIORef seTimeRef
         mapM_ (\f -> f seSim t) (sbTraceDump backend)
-        writeIORef seTimeRef (t + 1)
+        -- $! forces the new time to WHNF before storing. Without
+        -- this, `t + 1` is a lazy thunk; each tick adds another
+        -- `(prior + 1)` closure pointing at the previous one, and
+        -- the IORef pins the entire chain. At ~24 bytes per thunk
+        -- this exhausts a 48 GB heap by ~700 M cycles in long
+        -- Linux-boot hwsim runs.
+        writeIORef seTimeRef $! t + 1
 
 -- | Advance the simulation by @n@ clock periods.
 cycles :: (Storable state) => Int -> SimM ports state ()
